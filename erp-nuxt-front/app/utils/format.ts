@@ -10,10 +10,14 @@ export function formatNumber(value: number) {
   return new Intl.NumberFormat('ko-KR').format(value)
 }
 
-export function formatCellValue(value: string | number, type?: string) {
+export function formatCellValue(value: unknown, type?: string) {
   if (typeof value === 'number') {
     return type === 'numeric' && value >= 100000 ? formatCurrency(value) : formatNumber(value)
   }
 
-  return value
+  if (typeof value === 'boolean') {
+    return value ? 'true' : 'false'
+  }
+
+  return String(value ?? '')
 }

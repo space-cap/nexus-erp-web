@@ -84,7 +84,7 @@ export function useMockErpStore() {
   }))
 
   function list(dataset: string, params: ListParams = {}) {
-    return filterMockList(datasets.value[dataset] || [], params)
+    return filterMockList(datasets.value[dataset] || [], { ...params, groupKey: params.groupKey || dataset })
   }
 
   function statusOptions(dataset: string) {

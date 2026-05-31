@@ -82,6 +82,9 @@ Content-Type: application/json
 | `keyword` | 화면 검색어 |
 | `status` | 상태 필터 |
 | `period` | `all`, `week`, `month` |
+| `group` | 담당자, 거래처, 매입처, 창고, 라인, 부서 등 화면별 구분 필터 |
+| `sortKey` | 정렬할 필드명 |
+| `sortDir` | `asc`, `desc` |
 | `page` | 페이지 번호 |
 | `size` | 페이지 크기 |
 

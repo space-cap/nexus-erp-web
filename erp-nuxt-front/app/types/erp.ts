@@ -15,6 +15,10 @@ export interface ListParams {
   globalKeyword?: string
   status?: string
   period?: string
+  group?: string
+  groupKey?: string
+  sortKey?: string
+  sortDir?: 'asc' | 'desc'
 }
 
 export interface ListResponse<T extends ErpRow> {

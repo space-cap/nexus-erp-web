@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { Check, Download, Eye, Pencil, Plus, Save, SearchX, X } from '@lucide/vue'
+import { ArrowDown, ArrowUp, ArrowUpDown, Check, Download, Eye, Pencil, Plus, RotateCcw, Save, SearchX, X } from '@lucide/vue'
 import StatusBadge from '~/components/common/StatusBadge.vue'
 import { moduleDefinitions } from '~/constants/modules'
+import { getGroupValue } from '~/services/mockErpRepository'
 import type { ErpRow } from '~/types/erp'
 import { fieldLabel } from '~/utils/fields'
 import { formatCellValue, formatCurrency, formatNumber } from '~/utils/format'
@@ -18,16 +19,31 @@ const store = useMockErpStore()
 const keyword = ref('')
 const status = ref('all')
 const period = ref('all')
+const group = ref('all')
+const sortKey = ref('')
+const sortDir = ref<'asc' | 'desc'>('asc')
 const selectedIndex = ref(0)
 const modalOpen = ref(false)
 
 const config = computed(() => moduleDefinitions[props.moduleKey])
 const statuses = computed(() => store.statusOptions(config.value.dataset))
-const response = computed(() => store.list(config.value.dataset, {
+const baseResponse = computed(() => store.list(config.value.dataset, {
   keyword: keyword.value,
   globalKeyword: globalSearch.value,
   status: status.value,
   period: period.value
+}))
+const groupOptions = computed(() => [
+  ...new Set(baseResponse.value.items.map((row) => getGroupValue(row, config.value.dataset)).filter(Boolean))
+])
+const response = computed(() => store.list(config.value.dataset, {
+  keyword: keyword.value,
+  globalKeyword: globalSearch.value,
+  status: status.value,
+  period: period.value,
+  group: group.value,
+  sortKey: sortKey.value,
+  sortDir: sortDir.value
 }))
 const rows = computed(() => response.value.items)
 const summary = computed(() => response.value.summary)
@@ -39,8 +55,38 @@ const canCreateCurrent = computed(() => canAction(createActionKey.value))
 const canEditCurrent = computed(() => canAction(editActionKey.value))
 const canProcessCurrent = computed(() => processActionKey.value ? canAction(processActionKey.value) : true)
 
-watch([keyword, status, period, globalSearch], () => {
+const groupFilterLabel = computed(() => {
+  if (props.moduleKey === 'inventory') {
+    return '창고'
+  }
+
+  if (props.moduleKey === 'users') {
+    return '부서'
+  }
+
+  if (props.moduleKey === 'orders') {
+    return '거래처'
+  }
+
+  if (props.moduleKey === 'purchase') {
+    return '매입처'
+  }
+
+  if (props.moduleKey === 'production') {
+    return '라인'
+  }
+
+  return '담당/구분'
+})
+
+watch([keyword, status, period, group, globalSearch], () => {
   selectedIndex.value = 0
+})
+
+watch(groupOptions, () => {
+  if (group.value !== 'all' && !groupOptions.value.includes(group.value)) {
+    group.value = 'all'
+  }
 })
 
 function valueFor(row: ErpRow, key: string) {
@@ -65,8 +111,37 @@ function exportCsv() {
   showToast(`${config.value.title} CSV 파일을 생성했습니다.`)
 }
 
-function escapeCsv(value: string | number) {
+function escapeCsv(value: unknown) {
   return `"${String(value ?? '').replace(/"/g, '""')}"`
+}
+
+function toggleSort(key: string) {
+  if (sortKey.value === key) {
+    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    sortKey.value = key
+    sortDir.value = 'asc'
+  }
+
+  selectedIndex.value = 0
+}
+
+function resetFilters() {
+  keyword.value = ''
+  status.value = 'all'
+  period.value = 'all'
+  group.value = 'all'
+  sortKey.value = ''
+  sortDir.value = 'asc'
+  selectedIndex.value = 0
+}
+
+function sortLabel(columnKey: string) {
+  if (sortKey.value !== columnKey) {
+    return '정렬 없음'
+  }
+
+  return sortDir.value === 'asc' ? '오름차순' : '내림차순'
 }
 
 function closeModal() {
@@ -225,6 +300,13 @@ function openEdit(row: ErpRow) {
             </select>
           </label>
           <label class="field">
+            <span>{{ groupFilterLabel }}</span>
+            <select v-model="group">
+              <option value="all">전체</option>
+              <option v-for="option in groupOptions" :key="option" :value="option">{{ option }}</option>
+            </select>
+          </label>
+          <label class="field">
             <span>기간</span>
             <select v-model="period">
               <option value="all">전체</option>
@@ -232,6 +314,10 @@ function openEdit(row: ErpRow) {
               <option value="month">이번 달</option>
             </select>
           </label>
+          <button class="secondary-button filter-reset-button" type="button" @click="resetFilters">
+            <RotateCcw />
+            <span>초기화</span>
+          </button>
         </div>
 
         <div class="table-wrap">
@@ -239,7 +325,13 @@ function openEdit(row: ErpRow) {
             <thead>
               <tr>
                 <th v-for="column in config.columns" :key="column.key" :class="{ numeric: column.type === 'numeric' }">
-                  {{ column.label }}
+                  <button class="sort-button" type="button" @click="toggleSort(column.key)">
+                    <span>{{ column.label }}</span>
+                    <ArrowUp v-if="sortKey === column.key && sortDir === 'asc'" />
+                    <ArrowDown v-else-if="sortKey === column.key && sortDir === 'desc'" />
+                    <ArrowUpDown v-else />
+                    <span class="sr-only">{{ sortLabel(column.key) }}</span>
+                  </button>
                 </th>
               </tr>
             </thead>
