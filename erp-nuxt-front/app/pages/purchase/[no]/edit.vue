@@ -10,15 +10,19 @@ const no = computed(() => String(route.params.no))
 const purchase = computed(() => store.findByField('purchase', 'no', no.value))
 
 function updatePurchase(row: ErpRow) {
-  const updated = store.updatePurchase(no.value, row)
-  if (!updated) {
-    showToast('수정할 발주를 찾지 못했습니다.')
-    return
-  }
+  try {
+    const updated = store.updatePurchase(no.value, row)
+    if (!updated) {
+      showToast('수정할 발주를 찾지 못했습니다.')
+      return
+    }
 
-  const suffix = updated.received ? ' 입고까지 반영했습니다.' : ' 정보를 수정했습니다.'
-  showToast(`${updated.no} 발주${suffix}`)
-  router.push(`/purchase/${updated.no}`)
+    const suffix = updated.received ? ' 입고까지 반영했습니다.' : ' 정보를 수정했습니다.'
+    showToast(`${updated.no} 발주${suffix}`)
+    router.push(`/purchase/${updated.no}`)
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : '발주 상태를 확인하세요.')
+  }
 }
 </script>
 

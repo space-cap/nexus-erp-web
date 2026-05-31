@@ -1,6 +1,7 @@
 import { mockDatasets } from '~/data/mock/erp'
 import { filterMockList, getStatusOptions as getStaticStatusOptions } from '~/services/mockErpRepository'
 import type { ErpRow, ListParams } from '~/types/erp'
+import { assertWorkflowStatusTransition } from '~/utils/status'
 
 const todayText = '2026-05-31'
 const datasetStorageKey = 'erp-nuxt-mock-datasets-v2'
@@ -137,6 +138,8 @@ export function useMockErpStore() {
   }
 
   function createOrder(row: ErpRow) {
+    assertWorkflowStatusTransition('orders', undefined, String(row.status || '대기'), 'create')
+
     const order = normalizeOrder({
       ...row,
       no: nextNo('orders', 'SO'),
@@ -156,6 +159,8 @@ export function useMockErpStore() {
     if (!current) {
       return undefined
     }
+
+    assertWorkflowStatusTransition('orders', String(current.status), String(row.status || current.status))
 
     if (current.item && current.reservedQty) {
       adjustInventoryReservation(String(current.item), -Number(current.reservedQty || 0))
@@ -181,6 +186,8 @@ export function useMockErpStore() {
   }
 
   function createPurchase(row: ErpRow) {
+    assertWorkflowStatusTransition('purchase', undefined, String(row.status || '대기'), 'create')
+
     const purchase: ErpRow = {
       ...row,
       no: nextNo('purchase', 'PO'),
@@ -200,6 +207,8 @@ export function useMockErpStore() {
       return undefined
     }
 
+    assertWorkflowStatusTransition('purchase', String(current.status), String(row.status || current.status))
+
     const updated = completePurchaseIfNeeded({
       ...current,
       ...row,
@@ -212,6 +221,8 @@ export function useMockErpStore() {
   }
 
   function createProduction(row: ErpRow) {
+    assertWorkflowStatusTransition('production', undefined, String(row.status || '대기'), 'create')
+
     const production = completeProductionFlowIfNeeded({
       ...row,
       no: nextProductionNo(),
@@ -246,6 +257,8 @@ export function useMockErpStore() {
     if (!current) {
       return undefined
     }
+
+    assertWorkflowStatusTransition('production', String(current.status), String(row.status || current.status))
 
     const updated = completeProductionFlowIfNeeded({
       ...current,

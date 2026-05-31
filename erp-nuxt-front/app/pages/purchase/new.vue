@@ -27,9 +27,13 @@ const suggestedPurchase = computed(() => {
 })
 
 function createPurchase(row: ErpRow) {
-  const created = store.createPurchase(row)
-  showToast(`${created.no} 발주를 mock 데이터에 등록했습니다.`)
-  router.push('/purchase')
+  try {
+    const created = store.createPurchase(row)
+    showToast(`${created.no} 발주를 mock 데이터에 등록했습니다.`)
+    router.push('/purchase')
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : '발주 상태를 확인하세요.')
+  }
 }
 </script>
 

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ArrowLeft, Save } from '@lucide/vue'
 import type { ErpRow } from '~/types/erp'
+import { getSelectableWorkflowStatuses } from '~/utils/status'
 
 const props = withDefaults(defineProps<{
   mode?: 'create' | 'edit'
@@ -16,6 +17,7 @@ const emit = defineEmits<{
 
 const itemOptions = computed(() => (store.datasets.value.items || []).map((row) => String(row.name)))
 const lineOptions = ['전자조립 1라인', '가공 1라인', '가공 2라인', '조립 3라인', '포장 1라인']
+const statusOptions = computed(() => getSelectableWorkflowStatuses('production', String(props.initial?.status || '대기'), props.mode))
 
 const form = reactive({
   item: String(props.initial?.item || itemOptions.value[0] || ''),
@@ -25,6 +27,22 @@ const form = reactive({
   qty: Number(props.initial?.qty || 500),
   progress: Number(props.initial?.progress || 0),
   status: String(props.initial?.status || '대기')
+})
+
+watch(() => props.initial, (initial) => {
+  if (!initial) {
+    return
+  }
+
+  Object.assign(form, {
+    item: String(initial.item || itemOptions.value[0] || ''),
+    line: String(initial.line || lineOptions[0]),
+    start: String(initial.start || '2026-05-31'),
+    end: String(initial.end || '2026-06-07'),
+    qty: Number(initial.qty || 500),
+    progress: Number(initial.progress || 0),
+    status: String(initial.status || '대기')
+  })
 })
 
 function submitForm() {
@@ -71,10 +89,7 @@ function submitForm() {
       <label class="field">
         <span>상태</span>
         <select v-model="form.status">
-          <option>대기</option>
-          <option>진행</option>
-          <option>지연</option>
-          <option>완료</option>
+          <option v-for="status in statusOptions" :key="status">{{ status }}</option>
         </select>
       </label>
     </div>

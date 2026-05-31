@@ -10,19 +10,23 @@ const no = computed(() => String(route.params.no))
 const production = computed(() => store.findByField('production', 'no', no.value))
 
 function updateProduction(row: ErpRow) {
-  const updated = store.updateProduction(no.value, row)
-  if (!updated) {
-    showToast('수정할 생산 계획을 찾지 못했습니다.')
-    return
-  }
+  try {
+    const updated = store.updateProduction(no.value, row)
+    if (!updated) {
+      showToast('수정할 생산 계획을 찾지 못했습니다.')
+      return
+    }
 
-  const suffix = updated.productionReceived
-    ? ' 생산 완료 입고까지 반영했습니다.'
-    : updated.issued
-      ? ' 자재 출고까지 반영했습니다.'
-      : ' 정보를 수정했습니다.'
-  showToast(`${updated.no} 생산 계획${suffix}`)
-  router.push(`/production/${updated.no}`)
+    const suffix = updated.productionReceived
+      ? ' 생산 완료 입고까지 반영했습니다.'
+      : updated.issued
+        ? ' 자재 출고까지 반영했습니다.'
+        : ' 정보를 수정했습니다.'
+    showToast(`${updated.no} 생산 계획${suffix}`)
+    router.push(`/production/${updated.no}`)
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : '생산 상태를 확인하세요.')
+  }
 }
 </script>
 

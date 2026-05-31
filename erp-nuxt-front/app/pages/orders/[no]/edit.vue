@@ -10,14 +10,18 @@ const no = computed(() => String(route.params.no))
 const order = computed(() => store.findByField('orders', 'no', no.value))
 
 function updateOrder(row: ErpRow) {
-  const updated = store.updateOrder(no.value, row)
-  if (!updated) {
-    showToast('수정할 수주를 찾지 못했습니다.')
-    return
-  }
+  try {
+    const updated = store.updateOrder(no.value, row)
+    if (!updated) {
+      showToast('수정할 수주를 찾지 못했습니다.')
+      return
+    }
 
-  showToast(`${updated.no} 수주 정보를 수정했습니다.`)
-  router.push(`/orders/${updated.no}`)
+    showToast(`${updated.no} 수주 정보를 수정했습니다.`)
+    router.push(`/orders/${updated.no}`)
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : '수주 상태를 확인하세요.')
+  }
 }
 </script>
 

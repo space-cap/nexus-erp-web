@@ -7,9 +7,13 @@ const store = useMockErpStore()
 const { showToast } = useToast()
 
 function createOrder(row: ErpRow) {
-  const created = store.createOrder(row)
-  showToast(`${created.no} 수주를 mock 데이터에 등록했습니다.`)
-  router.push('/orders')
+  try {
+    const created = store.createOrder(row)
+    showToast(`${created.no} 수주를 mock 데이터에 등록했습니다.`)
+    router.push('/orders')
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : '수주 상태를 확인하세요.')
+  }
 }
 </script>
 
