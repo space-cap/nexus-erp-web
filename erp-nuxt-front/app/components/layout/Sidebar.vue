@@ -4,6 +4,7 @@ import {
   Building2,
   Factory,
   FileCheck2,
+  History,
   LayoutDashboard,
   LogIn,
   Package,
@@ -24,6 +25,7 @@ const navItems = [
   { key: 'orders', to: '/orders', label: '수주 관리', icon: FileCheck2 },
   { key: 'purchase', to: '/purchase', label: '발주 관리', icon: ShoppingCart },
   { key: 'production', to: '/production', label: '생산 계획', icon: Factory },
+  { key: 'audit-logs', to: '/audit-logs', label: '처리 이력', icon: History },
   { key: 'users', to: '/users', label: '사용자 관리', icon: ShieldCheck },
   { key: 'login', to: '/login', label: '로그인/권한', icon: LogIn }
 ]

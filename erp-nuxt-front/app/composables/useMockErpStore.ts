@@ -6,21 +6,60 @@ import { assertWorkflowStatusTransition } from '~/utils/status'
 const todayText = '2026-05-31'
 const datasetStorageKey = 'erp-nuxt-mock-datasets-v2'
 const stockStorageKey = 'erp-nuxt-stock-transactions-v2'
+const auditLogStorageKey = 'erp-nuxt-audit-logs-v1'
 
 const initialStockTransactions: ErpRow[] = [
   { no: 'ST-260531-001', type: '입고', item: '컨트롤 PCB V2', warehouse: '전자부품 창고', qty: 120, owner: '이자재', memo: '발주 입고 mock', lastDate: todayText, status: '완료' },
   { no: 'ST-260531-002', type: '출고', item: '모터 브라켓', warehouse: '가공품 창고', qty: 60, owner: '박생산', memo: '생산 투입 mock', lastDate: todayText, status: '완료' }
 ]
 
+const initialAuditLogs: ErpRow[] = [
+  {
+    id: 'AUD-260531-001',
+    moduleKey: 'orders',
+    moduleName: '수주',
+    action: '상태 변경',
+    documentNo: 'SO-260529-001',
+    summary: '수주 완료 출고 처리',
+    beforeStatus: '진행',
+    afterStatus: '완료',
+    actor: '김관리',
+    role: 'ERP 관리자',
+    dept: '경영지원',
+    memo: '초기 mock 처리 이력',
+    createdAt: `${todayText} 09:20:00`,
+    status: '완료'
+  },
+  {
+    id: 'AUD-260531-002',
+    moduleKey: 'purchase',
+    moduleName: '발주',
+    action: '상태 변경',
+    documentNo: 'PO-260522-003',
+    summary: '발주 완료 입고 처리',
+    beforeStatus: '진행',
+    afterStatus: '완료',
+    actor: '박구매',
+    role: '구매 담당',
+    dept: '구매팀',
+    memo: '초기 mock 처리 이력',
+    createdAt: `${todayText} 10:10:00`,
+    status: '완료'
+  }
+]
+
 export function useMockErpStore() {
+  const { currentUser } = useMockAuth()
   const datasets = useState<Record<string, ErpRow[]>>('mock-erp-datasets', () => normalizeDatasets(cloneDatasets()))
   const stockTransactions = useState<ErpRow[]>('mock-stock-transactions', () => initialStockTransactions.map((row) => ({ ...row })))
+  const auditLogs = useState<ErpRow[]>('mock-audit-logs', () => initialAuditLogs.map((row) => ({ ...row })))
   const hydrated = useState('mock-erp-store-hydrated', () => false)
 
   if (import.meta.client && !hydrated.value) {
     onMounted(() => {
       const savedDatasets = readStored<Record<string, ErpRow[]>>(datasetStorageKey)
       const savedTransactions = readStored<ErpRow[]>(stockStorageKey)
+      const savedAuditLogs = readStored<ErpRow[]>(auditLogStorageKey)
 
       if (savedDatasets) {
         datasets.value = normalizeDatasets(savedDatasets)
@@ -28,6 +67,10 @@ export function useMockErpStore() {
 
       if (savedTransactions) {
         stockTransactions.value = savedTransactions
+      }
+
+      if (savedAuditLogs) {
+        auditLogs.value = savedAuditLogs
       }
 
       hydrated.value = true
@@ -151,6 +194,15 @@ export function useMockErpStore() {
     if (order.reservedQty) {
       adjustInventoryReservation(String(order.item || ''), Number(order.reservedQty || 0))
     }
+    recordAuditLog({
+      moduleKey: 'orders',
+      moduleName: '수주',
+      action: '등록',
+      documentNo: String(order.no),
+      summary: `${order.customer || ''} ${order.item || ''} 수주 등록`,
+      afterStatus: String(order.status),
+      memo: `${formatAuditQty(order.qty)} 수주`
+    })
     return order
   }
 
@@ -177,6 +229,7 @@ export function useMockErpStore() {
     }
 
     upsertRow('orders', 'no', updated)
+    recordWorkflowAudit('orders', '수주', current, updated, `${updated.customer || ''} ${updated.item || ''} 수주 수정`)
 
     if (updated.reservedQty) {
       adjustInventoryReservation(String(updated.item || ''), Number(updated.reservedQty || 0))
@@ -198,6 +251,15 @@ export function useMockErpStore() {
     }
     const saved = completePurchaseIfNeeded(purchase)
     upsertRow('purchase', 'no', saved)
+    recordAuditLog({
+      moduleKey: 'purchase',
+      moduleName: '발주',
+      action: '등록',
+      documentNo: String(saved.no),
+      summary: `${saved.vendor || ''} ${saved.item || ''} 발주 등록`,
+      afterStatus: String(saved.status),
+      memo: `${formatAuditQty(saved.qty)} 발주`
+    })
     return saved
   }
 
@@ -217,6 +279,7 @@ export function useMockErpStore() {
       qty: Number(row.qty || current.qty || 0)
     })
     upsertRow('purchase', 'no', updated)
+    recordWorkflowAudit('purchase', '발주', current, updated, `${updated.vendor || ''} ${updated.item || ''} 발주 수정`)
     return updated
   }
 
@@ -231,6 +294,15 @@ export function useMockErpStore() {
       status: row.status || '대기'
     })
     upsertRow('production', 'no', production)
+    recordAuditLog({
+      moduleKey: 'production',
+      moduleName: '생산',
+      action: '등록',
+      documentNo: String(production.no),
+      summary: `${production.item || ''} 생산 계획 등록`,
+      afterStatus: String(production.status),
+      memo: `${formatAuditQty(production.qty)} 생산`
+    })
     return production
   }
 
@@ -268,6 +340,7 @@ export function useMockErpStore() {
       progress: Number(row.progress || current.progress || 0)
     })
     upsertRow('production', 'no', updated)
+    recordWorkflowAudit('production', '생산', current, updated, `${updated.item || ''} 생산 계획 수정`)
     return updated
   }
 
@@ -287,7 +360,63 @@ export function useMockErpStore() {
     stockTransactions.value = [transaction, ...stockTransactions.value]
     applyStockTransaction(transaction)
     persistStockTransactions()
+    recordAuditLog({
+      moduleKey: 'inventory',
+      moduleName: '재고',
+      action: `${transaction.type} 처리`,
+      documentNo: String(transaction.no),
+      summary: `${transaction.item || ''} ${transaction.type} ${formatAuditQty(transaction.qty)}`,
+      afterStatus: String(transaction.status),
+      memo: String(transaction.memo || transaction.warehouse || '')
+    })
     return transaction
+  }
+
+  function recordWorkflowAudit(moduleKey: string, moduleName: string, before: ErpRow, after: ErpRow, summary: string) {
+    const statusChanged = String(before.status || '') !== String(after.status || '')
+    const qtyChanged = Number(before.qty || 0) !== Number(after.qty || 0)
+    const amountChanged = Number(before.amount || 0) !== Number(after.amount || 0)
+    const progressChanged = Number(before.progress || 0) !== Number(after.progress || 0)
+
+    recordAuditLog({
+      moduleKey,
+      moduleName,
+      action: statusChanged ? '상태 변경' : '수정',
+      documentNo: String(after.no || after.code || ''),
+      summary,
+      beforeStatus: String(before.status || ''),
+      afterStatus: String(after.status || ''),
+      memo: [
+        statusChanged ? `${before.status} → ${after.status}` : '',
+        qtyChanged ? `수량 ${formatAuditQty(before.qty)} → ${formatAuditQty(after.qty)}` : '',
+        amountChanged ? '금액 변경' : '',
+        progressChanged ? `진행률 ${before.progress || 0}% → ${after.progress || 0}%` : ''
+      ].filter(Boolean).join(', ') || '기본 정보 수정'
+    })
+  }
+
+  function recordAuditLog(input: Partial<ErpRow>) {
+    const actor = currentUser.value
+    const log: ErpRow = {
+      id: nextAuditNo(),
+      moduleKey: input.moduleKey || '',
+      moduleName: input.moduleName || '',
+      action: input.action || '처리',
+      documentNo: input.documentNo || '',
+      summary: input.summary || '',
+      beforeStatus: input.beforeStatus || '',
+      afterStatus: input.afterStatus || '',
+      actor: actor.name,
+      role: actor.role,
+      dept: actor.dept,
+      memo: input.memo || '',
+      createdAt: input.createdAt || nowText(),
+      status: '완료'
+    }
+
+    auditLogs.value = [log, ...auditLogs.value].slice(0, 200)
+    persistAuditLogs()
+    return log
   }
 
   function normalizeOrder(row: ErpRow) {
@@ -438,6 +567,10 @@ export function useMockErpStore() {
     return `ST-260531-${String(stockTransactions.value.length + 1).padStart(3, '0')}`
   }
 
+  function nextAuditNo() {
+    return `AUD-260531-${String(auditLogs.value.length + 1).padStart(3, '0')}`
+  }
+
   function adjustInventoryReservation(itemName: string, qtyDelta: number) {
     if (!itemName || !qtyDelta) {
       return
@@ -506,9 +639,14 @@ export function useMockErpStore() {
     writeStored(stockStorageKey, stockTransactions.value)
   }
 
+  function persistAuditLogs() {
+    writeStored(auditLogStorageKey, auditLogs.value)
+  }
+
   return {
     datasets,
     stockTransactions,
+    auditLogs,
     purchaseCandidates,
     list,
     statusOptions,
@@ -525,7 +663,8 @@ export function useMockErpStore() {
     createProduction,
     createProductionFromOrder,
     updateProduction,
-    addStockTransaction
+    addStockTransaction,
+    recordAuditLog
   }
 }
 
@@ -574,4 +713,14 @@ function writeStored(key: string, value: unknown) {
   }
 
   window.localStorage.setItem(key, JSON.stringify(value))
+}
+
+function nowText() {
+  const date = new Date()
+  const kst = new Date(date.getTime() + 9 * 60 * 60 * 1000)
+  return kst.toISOString().replace('T', ' ').slice(0, 19)
+}
+
+function formatAuditQty(value: unknown) {
+  return `${Number(value || 0).toLocaleString('ko-KR')}개`
 }

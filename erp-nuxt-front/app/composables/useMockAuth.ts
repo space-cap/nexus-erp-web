@@ -18,7 +18,7 @@ const defaultSession: MockSession = {
 }
 
 const rolePermissions: Record<string, string[]> = {
-  'ERP 관리자': ['dashboard', 'customers', 'items', 'inventory', 'inventory-transactions', 'orders', 'purchase', 'production', 'users'],
+  'ERP 관리자': ['dashboard', 'customers', 'items', 'inventory', 'inventory-transactions', 'orders', 'purchase', 'production', 'audit-logs', 'users'],
   '영업 담당': ['dashboard', 'customers', 'items', 'orders', 'production'],
   '구매 담당': ['dashboard', 'customers', 'items', 'inventory', 'inventory-transactions', 'purchase'],
   '재고 담당': ['dashboard', 'items', 'inventory', 'inventory-transactions', 'purchase'],
