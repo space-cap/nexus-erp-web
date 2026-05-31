@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ERP Web Mock UI</title>
+    <link rel="stylesheet" href="css/styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="ERP 메뉴">
+        <div class="brand">
+          <div class="brand-mark">E</div>
+          <div>
+            <strong>ERP Web</strong>
+            <span>Mock workspace</span>
+          </div>
+        </div>
+
+        <nav class="nav-list" id="navList">
+          <button class="nav-item active" data-section="dashboard" type="button">
+            <i data-lucide="layout-dashboard"></i>
+            <span>대시보드</span>
+          </button>
+          <button class="nav-item" data-section="customers" type="button">
+            <i data-lucide="building-2"></i>
+            <span>거래처 관리</span>
+          </button>
+          <button class="nav-item" data-section="items" type="button">
+            <i data-lucide="package"></i>
+            <span>품목 관리</span>
+          </button>
+          <button class="nav-item" data-section="inventory" type="button">
+            <i data-lucide="warehouse"></i>
+            <span>재고 현황</span>
+          </button>
+          <button class="nav-item" data-section="orders" type="button">
+            <i data-lucide="file-check-2"></i>
+            <span>수주 관리</span>
+          </button>
+          <button class="nav-item" data-section="purchase" type="button">
+            <i data-lucide="shopping-cart"></i>
+            <span>발주 관리</span>
+          </button>
+          <button class="nav-item" data-section="production" type="button">
+            <i data-lucide="factory"></i>
+            <span>생산 계획</span>
+          </button>
+          <button class="nav-item" data-section="users" type="button">
+            <i data-lucide="shield-check"></i>
+            <span>사용자 관리</span>
+          </button>
+        </nav>
+
+        <div class="sidebar-footer">
+          <span>사업장</span>
+          <strong>본사 / 생산1공장</strong>
+        </div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <button class="icon-button menu-toggle" id="menuToggle" type="button" aria-label="메뉴 열기">
+            <i data-lucide="menu"></i>
+          </button>
+          <label class="global-search" for="globalSearch">
+            <i data-lucide="search"></i>
+            <input id="globalSearch" type="search" placeholder="거래처, 품목, 문서번호 검색">
+          </label>
+          <div class="topbar-actions">
+            <button class="icon-button" type="button" aria-label="알림">
+              <i data-lucide="bell"></i>
+              <span class="notification-dot"></span>
+            </button>
+            <button class="user-button" type="button">
+              <span class="avatar">김</span>
+              <span>김관리</span>
+              <i data-lucide="chevron-down"></i>
+            </button>
+          </div>
+        </header>
+
+        <section class="page-hero">
+          <div>
+            <p class="eyebrow" id="sectionEyebrow">ERP 통합 현황</p>
+            <h1 id="sectionTitle">대시보드</h1>
+          </div>
+          <div class="hero-actions">
+            <button class="secondary-button" id="exportButton" type="button">
+              <i data-lucide="download"></i>
+              <span>CSV</span>
+            </button>
+            <button class="primary-button" id="newRecordButton" type="button">
+              <i data-lucide="plus"></i>
+              <span>신규</span>
+            </button>
+          </div>
+        </section>
+
+        <section class="dashboard-view" id="dashboardView" aria-label="대시보드">
+          <div class="kpi-grid" id="kpiGrid"></div>
+          <div class="dashboard-grid">
+            <section class="panel wide-panel">
+              <div class="panel-header">
+                <div>
+                  <h2>월간 매출 흐름</h2>
+                  <p>수주와 매출 mock 집계</p>
+                </div>
+                <button class="icon-button" type="button" aria-label="새로고침">
+                  <i data-lucide="refresh-cw"></i>
+                </button>
+              </div>
+              <div class="bar-chart" id="salesChart"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header">
+                <div>
+                  <h2>처리 필요</h2>
+                  <p>승인, 납기, 재고 예외</p>
+                </div>
+              </div>
+              <div class="task-list" id="taskList"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header">
+                <div>
+                  <h2>재고 경고</h2>
+                  <p>안전재고 이하 품목</p>
+                </div>
+              </div>
+              <div class="compact-list" id="stockAlerts"></div>
+            </section>
+
+            <section class="panel wide-panel">
+              <div class="panel-header">
+                <div>
+                  <h2>생산 일정</h2>
+                  <p>라인별 진행률</p>
+                </div>
+              </div>
+              <div class="timeline-list" id="productionTimeline"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="module-view hidden" id="moduleView" aria-label="업무 목록">
+          <div class="summary-strip" id="summaryStrip"></div>
+
+          <div class="workbench">
+            <section class="list-area">
+              <div class="filter-bar">
+                <label class="field">
+                  <span>검색</span>
+                  <input id="moduleSearch" type="search" placeholder="현재 화면에서 검색">
+                </label>
+                <label class="field">
+                  <span>상태</span>
+                  <select id="statusFilter"></select>
+                </label>
+                <label class="field">
+                  <span>기간</span>
+                  <select id="periodFilter">
+                    <option value="all">전체</option>
+                    <option value="week">최근 7일</option>
+                    <option value="month">이번 달</option>
+                  </select>
+                </label>
+              </div>
+
+              <div class="table-wrap">
+                <table>
+                  <thead id="tableHead"></thead>
+                  <tbody id="tableBody"></tbody>
+                </table>
+              </div>
+            </section>
+
+            <aside class="detail-panel" id="detailPanel" aria-label="상세 정보">
+              <div class="empty-detail">
+                <i data-lucide="mouse-pointer-click"></i>
+                <strong>목록에서 행을 선택하세요</strong>
+                <span>선택한 데이터의 상세 정보와 처리 상태가 표시됩니다.</span>
+              </div>
+            </aside>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="modal-backdrop hidden" id="recordModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <section class="modal">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Mock 등록</p>
+            <h2 id="modalTitle">신규 데이터</h2>
+          </div>
+          <button class="icon-button" id="closeModalButton" type="button" aria-label="닫기">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+        <form class="modal-form" id="recordForm">
+          <label>
+            <span>제목</span>
+            <input name="title" required placeholder="예: 신규 거래처 등록">
+          </label>
+          <label>
+            <span>담당자</span>
+            <input name="owner" required placeholder="예: 김관리">
+          </label>
+          <label>
+            <span>상태</span>
+            <select name="status">
+              <option>대기</option>
+              <option>진행</option>
+              <option>정상</option>
+              <option>완료</option>
+            </select>
+          </label>
+          <label>
+            <span>메모</span>
+            <textarea name="memo" rows="4" placeholder="mock 데이터 검토용 메모"></textarea>
+          </label>
+          <div class="modal-actions">
+            <button class="secondary-button" type="button" id="cancelModalButton">취소</button>
+            <button class="primary-button" type="submit">
+              <i data-lucide="save"></i>
+              <span>저장</span>
+            </button>
+          </div>
+        </form>
+      </section>
+    </div>
+
+    <div class="toast hidden" id="toast"></div>
+
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <script src="js/mock-data.js"></script>
+    <script src="js/app.js"></script>
+  </body>
+</html>
