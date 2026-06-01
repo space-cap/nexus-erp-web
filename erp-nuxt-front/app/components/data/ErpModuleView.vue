@@ -1,11 +1,29 @@
 <script setup lang="ts">
-import { ArrowDown, ArrowUp, ArrowUpDown, Check, Download, Eye, Pencil, Plus, RotateCcw, Save, SearchX, X } from '@lucide/vue'
+import { ArrowDown, ArrowUp, ArrowUpDown, Check, Download, Eye, Pencil, Plus, RotateCcw, Save, SearchX, Upload, X } from '@lucide/vue'
 import StatusBadge from '~/components/common/StatusBadge.vue'
 import { moduleDefinitions } from '~/constants/modules'
 import { getGroupValue } from '~/services/mockErpRepository'
-import type { ErpRow } from '~/types/erp'
+import type { ErpRow, ErpStatus } from '~/types/erp'
 import { fieldLabel } from '~/utils/fields'
 import { formatCellValue, formatCurrency, formatNumber } from '~/utils/format'
+
+type ImportPreviewRow = {
+  index: number
+  row: Record<string, string>
+  values: string[]
+  errors: string[]
+}
+
+const erpStatusValues: ErpStatus[] = ['정상', '진행', '대기', '지연', '부족', '완료', '중지', '취소']
+const importRequiredFields: Record<string, string[]> = {
+  customers: ['name', 'manager'],
+  items: ['name'],
+  inventory: ['item', 'warehouse'],
+  orders: ['customer', 'item'],
+  purchase: ['vendor', 'item'],
+  production: ['item', 'line'],
+  users: ['name', 'dept', 'role']
+}
 
 const props = defineProps<{
   moduleKey: string
@@ -24,6 +42,9 @@ const sortKey = ref('')
 const sortDir = ref<'asc' | 'desc'>('asc')
 const selectedIndex = ref(0)
 const modalOpen = ref(false)
+const importModalOpen = ref(false)
+const csvText = ref('')
+const importFileName = ref('')
 
 const config = computed(() => moduleDefinitions[props.moduleKey])
 const statuses = computed(() => store.statusOptions(config.value.dataset))
@@ -54,6 +75,11 @@ const processActionKey = computed(() => props.moduleKey === 'purchase' ? 'proces
 const canCreateCurrent = computed(() => canAction(createActionKey.value))
 const canEditCurrent = computed(() => canAction(editActionKey.value))
 const canProcessCurrent = computed(() => processActionKey.value ? canAction(processActionKey.value) : true)
+const canImportCurrent = computed(() => canCreateCurrent.value || canEditCurrent.value)
+const importPreviewRows = computed(() => createImportPreview(csvText.value))
+const validImportRows = computed(() => importPreviewRows.value.filter((row) => !row.errors.length).map((row) => coerceImportRow(row.row)))
+const importErrorCount = computed(() => importPreviewRows.value.filter((row) => row.errors.length).length)
+const importPlaceholder = computed(() => config.value.columns.map((column) => column.label).join(','))
 
 const groupFilterLabel = computed(() => {
   if (props.moduleKey === 'inventory') {
@@ -111,6 +137,17 @@ function exportCsv() {
   showToast(`${config.value.title} CSV 파일을 생성했습니다.`)
 }
 
+function downloadImportTemplate() {
+  const csv = `${config.value.columns.map((column) => column.label).join(',')}\n`
+  const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `${config.value.title.replace(/\s+/g, '_')}_import_template.csv`
+  link.click()
+  URL.revokeObjectURL(url)
+}
+
 function escapeCsv(value: unknown) {
   return `"${String(value ?? '').replace(/"/g, '""')}"`
 }
@@ -148,9 +185,163 @@ function closeModal() {
   modalOpen.value = false
 }
 
+function openImport() {
+  csvText.value = ''
+  importFileName.value = ''
+  importModalOpen.value = true
+}
+
+function closeImportModal() {
+  importModalOpen.value = false
+}
+
+async function handleImportFile(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) {
+    return
+  }
+
+  csvText.value = await file.text()
+  importFileName.value = file.name
+  input.value = ''
+}
+
+function submitImport() {
+  if (!validImportRows.value.length) {
+    showToast('반영할 수 있는 CSV 행이 없습니다.')
+    return
+  }
+
+  const result = store.importRows(config.value.dataset, validImportRows.value, config.value.title)
+  closeImportModal()
+  resetFilters()
+  showToast(`${config.value.title} ${result.totalCount}건을 가져왔습니다.`)
+}
+
 function submitMockForm() {
   closeModal()
   showToast('신규 mock 데이터가 저장된 것처럼 처리했습니다.')
+}
+
+function createImportPreview(input: string): ImportPreviewRow[] {
+  const csvRows = parseCsv(input.trim())
+  if (csvRows.length < 2) {
+    return []
+  }
+
+  const headers = csvRows[0].map((header) => resolveImportKey(header))
+  return csvRows.slice(1)
+    .filter((row) => row.some((value) => value.trim()))
+    .map((row, index) => {
+      const mappedRow: Record<string, string> = {}
+
+      headers.forEach((key, columnIndex) => {
+        if (key) {
+          mappedRow[key] = String(row[columnIndex] || '').trim()
+        }
+      })
+
+      const errors = validateImportRow(mappedRow)
+      return {
+        index: index + 1,
+        row: mappedRow,
+        values: config.value.columns.map((column) => String(mappedRow[column.key] || '')),
+        errors
+      }
+    })
+}
+
+function parseCsv(input: string) {
+  const rows: string[][] = []
+  let current = ''
+  let row: string[] = []
+  let quoted = false
+  const text = input.replace(/^\uFEFF/, '')
+
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index]
+    const nextChar = text[index + 1]
+
+    if (char === '"' && quoted && nextChar === '"') {
+      current += '"'
+      index += 1
+    } else if (char === '"') {
+      quoted = !quoted
+    } else if (char === ',' && !quoted) {
+      row.push(current)
+      current = ''
+    } else if ((char === '\n' || char === '\r') && !quoted) {
+      if (char === '\r' && nextChar === '\n') {
+        index += 1
+      }
+      row.push(current)
+      rows.push(row)
+      row = []
+      current = ''
+    } else {
+      current += char
+    }
+  }
+
+  row.push(current)
+  rows.push(row)
+  return rows
+}
+
+function resolveImportKey(header: string) {
+  const normalized = normalizeImportHeader(header)
+  return config.value.columns.find((column) => {
+    return normalizeImportHeader(column.label) === normalized || normalizeImportHeader(column.key) === normalized
+  })?.key || ''
+}
+
+function normalizeImportHeader(value: string) {
+  return value.trim().toLowerCase().replace(/\s+/g, '')
+}
+
+function validateImportRow(row: Record<string, string>) {
+  const errors: string[] = []
+  const requiredFields = importRequiredFields[config.value.dataset] || []
+
+  requiredFields.forEach((key) => {
+    if (!row[key]) {
+      errors.push(`${fieldLabel(key)} 누락`)
+    }
+  })
+
+  config.value.columns
+    .filter((column) => column.type === 'numeric' || column.type === 'progress')
+    .forEach((column) => {
+      if (row[column.key] && !Number.isFinite(Number(row[column.key].replace(/,/g, '')))) {
+        errors.push(`${column.label} 숫자 오류`)
+      }
+    })
+
+  if (row.status && !erpStatusValues.includes(row.status as ErpStatus)) {
+    errors.push('상태값 오류')
+  }
+
+  return errors
+}
+
+function coerceImportRow(row: Record<string, string>) {
+  const nextRow: ErpRow = {
+    status: erpStatusValues.includes(row.status as ErpStatus) ? row.status as ErpStatus : '대기'
+  }
+
+  config.value.columns.forEach((column) => {
+    const value = row[column.key]
+    if (value === undefined || value === '') {
+      return
+    }
+
+    nextRow[column.key] = column.type === 'numeric' || column.type === 'progress'
+      ? Number(value.replace(/,/g, ''))
+      : value
+  })
+
+  return nextRow
 }
 
 function openNew() {
@@ -256,6 +447,10 @@ function openEdit(row: ErpRow) {
       <button class="secondary-button" type="button" @click="exportCsv">
         <Download />
         <span>CSV</span>
+      </button>
+      <button v-if="canImportCurrent" class="secondary-button" type="button" @click="openImport">
+        <Upload />
+        <span>가져오기</span>
       </button>
       <button v-if="canCreateCurrent" class="primary-button" type="button" @click="openNew">
         <Plus />
@@ -439,6 +634,66 @@ function openEdit(row: ErpRow) {
           </button>
         </div>
       </form>
+    </section>
+  </div>
+
+  <div v-if="importModalOpen" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="importModalTitle" @click.self="closeImportModal">
+    <section class="modal import-modal">
+      <div class="modal-header">
+        <div>
+          <p class="eyebrow">CSV Import</p>
+          <h2 id="importModalTitle">{{ config.title }} 가져오기</h2>
+        </div>
+        <button class="icon-button" type="button" aria-label="닫기" @click="closeImportModal">
+          <X />
+        </button>
+      </div>
+      <div class="modal-form">
+        <div class="import-toolbar">
+          <label class="secondary-button import-file-button">
+            <Upload />
+            <span>파일 선택</span>
+            <input type="file" accept=".csv,text/csv" @change="handleImportFile">
+          </label>
+          <button class="secondary-button" type="button" @click="downloadImportTemplate">
+            <Download />
+            <span>양식 CSV</span>
+          </button>
+          <span v-if="importFileName" class="import-file-name">{{ importFileName }}</span>
+        </div>
+        <label>
+          <span>CSV 데이터</span>
+          <textarea v-model="csvText" rows="7" :placeholder="importPlaceholder"></textarea>
+        </label>
+        <div class="import-summary">
+          <span>미리보기 {{ importPreviewRows.length }}건</span>
+          <span>정상 {{ validImportRows.length }}건</span>
+          <span>오류 {{ importErrorCount }}건</span>
+        </div>
+        <div v-if="importPreviewRows.length" class="table-wrap import-preview-table">
+          <table>
+            <thead>
+              <tr>
+                <th>검증</th>
+                <th v-for="column in config.columns" :key="column.key">{{ column.label }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in importPreviewRows" :key="row.index" :class="{ invalid: row.errors.length }">
+                <td>{{ row.errors.length ? row.errors.join(', ') : '정상' }}</td>
+                <td v-for="(value, valueIndex) in row.values" :key="valueIndex">{{ value || '-' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="modal-actions">
+          <button class="secondary-button" type="button" @click="closeImportModal">취소</button>
+          <button class="primary-button" type="button" :disabled="!validImportRows.length" @click="submitImport">
+            <Save />
+            <span>반영</span>
+          </button>
+        </div>
+      </div>
     </section>
   </div>
 </template>

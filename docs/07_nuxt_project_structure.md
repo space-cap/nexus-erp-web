@@ -51,11 +51,11 @@ erp-nuxt-front
 | --- | --- | --- |
 | `/` | 대시보드 진입 | 기본 진입 화면 |
 | `/dashboard` | 대시보드 | KPI, 매출 흐름, 재고 경고, 생산 일정 |
-| `/customers` | 거래처 관리 | 거래처 목록, 검색, 상세 패널 |
+| `/customers` | 거래처 관리 | 거래처 목록, 검색, CSV 가져오기, 상세 패널 |
 | `/customers/new` | 거래처 신규 등록 | mock 거래처 등록 |
 | `/customers/[code]` | 거래처 상세 | 거래처 상세 조회 |
 | `/customers/[code]/edit` | 거래처 수정 | mock 거래처 수정 |
-| `/items` | 품목 관리 | 품목 목록, 검색, 상세 패널 |
+| `/items` | 품목 관리 | 품목 목록, 검색, CSV 가져오기, 상세 패널 |
 | `/items/new` | 품목 신규 등록 | mock 품목 등록 |
 | `/items/[code]` | 품목 상세 | 품목 상세 조회 |
 | `/items/[code]/edit` | 품목 수정 | mock 품목 수정 |
@@ -105,6 +105,7 @@ app/data/mock/erp.ts
 - 대시보드 발주 후보 자동 표시
 - 대시보드 발주 후보에서 발주 등록 폼 자동 채우기
 - 공통 목록 검색, 상태/기간/담당 필터, 컬럼 정렬
+- CSV 가져오기 미리보기, 오류 행 표시, 정상 행 mock 반영
 - 역할별 등록/수정/처리 버튼 노출 제어
 - 역할별 URL 직접 접근 제한
 - 수주/발주/생산/재고 처리 이력 자동 기록
@@ -121,7 +122,7 @@ app/data/mock/erp.ts
 | `Sidebar.vue` | 메뉴와 권한별 메뉴 노출 |
 | `Topbar.vue` | 전역 검색, 알림, 현재 사용자 |
 | `DashboardView.vue` | 대시보드 KPI와 업무 현황 |
-| `ErpModuleView.vue` | ERP 목록, 필터, 상세 패널 공통 화면 |
+| `ErpModuleView.vue` | ERP 목록, 필터, CSV 가져오기, 상세 패널 공통 화면 |
 | `CustomerForm.vue` | 거래처 등록/수정 폼 |
 | `ItemForm.vue` | 품목 등록/수정 폼 |
 | `OrderForm.vue` | 수주 등록/수정 폼 |

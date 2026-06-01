@@ -902,6 +902,10 @@ tbody tr.selected {
   box-shadow: var(--shadow);
 }
 
+.import-modal {
+  width: min(960px, 100%);
+}
+
 .modal-header {
   display: flex;
   align-items: flex-start;
@@ -919,6 +923,52 @@ tbody tr.selected {
   display: grid;
   gap: 14px;
   padding: 20px;
+}
+
+.import-toolbar,
+.import-summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.import-file-button input {
+  display: none;
+}
+
+.import-file-name {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.import-summary span {
+  min-height: 28px;
+  padding: 5px 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.import-preview-table {
+  max-height: 280px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.import-preview-table table {
+  min-width: 920px;
+}
+
+.import-preview-table tr.invalid {
+  background: #fef2f2;
+}
+
+.import-preview-table tr.invalid td:first-child {
+  color: #b91c1c;
+  font-weight: 800;
 }
 
 .toast {

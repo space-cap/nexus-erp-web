@@ -88,6 +88,15 @@ Content-Type: application/json
 | `page` | 페이지 번호 |
 | `size` | 페이지 크기 |
 
+공통 CSV 가져오기:
+
+| Method | URL | 설명 |
+| --- | --- | --- |
+| `POST` | `/api/{resource}/import-preview` | CSV 파일 또는 붙여넣기 데이터를 검증하고 정상/오류 행을 반환 |
+| `POST` | `/api/{resource}/import` | 검증된 정상 행만 신규/수정 반영 |
+
+가져오기 요청은 `multipart/form-data` 파일 업로드 또는 JSON 본문 `{ "rows": [] }` 방식 중 백엔드 구현 시 하나를 선택한다. 반영 결과는 신규 건수, 수정 건수, 오류 건수를 반환하고 감사 로그에는 `CSV 가져오기` 액션을 기록한다.
+
 공통 상태값:
 
 ```text
@@ -345,7 +354,7 @@ Content-Type: application/json
 | --- | --- |
 | `keyword` | 이력 번호, 문서 번호, 처리자, 메모 검색 |
 | `moduleKey` | `orders`, `purchase`, `production`, `inventory` |
-| `action` | `등록`, `수정`, `상태 변경`, `입고 처리`, `출고 처리`, `조정 처리` |
+| `action` | `등록`, `수정`, `상태 변경`, `입고 처리`, `출고 처리`, `조정 처리`, `CSV 가져오기` |
 | `page` | 페이지 번호 |
 | `size` | 페이지 크기 |
 
@@ -391,7 +400,7 @@ Content-Type: application/json
 - 기존 Delphi ERP 코드 체계와 전표 번호 생성 규칙
 - 실제 DB 테이블과 화면 필드 매핑
 - 인증 방식: 세션, JWT, 사내 SSO 여부
-- 파일 첨부, 엑셀 다운로드, CSV 다운로드 방식
+- 파일 첨부, 엑셀 다운로드, CSV 다운로드/가져오기 방식
 - 수주 완료 출고, 발주 완료 입고, 생산 투입/완료 입고의 트랜잭션 경계
 - 낙관적 잠금 또는 전표 중복 처리 방식
 - 감사 로그: 누가, 언제, 어떤 값을 변경했는지 기록

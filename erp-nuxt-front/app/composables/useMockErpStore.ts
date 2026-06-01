@@ -7,6 +7,15 @@ const todayText = '2026-05-31'
 const datasetStorageKey = 'erp-nuxt-mock-datasets-v2'
 const stockStorageKey = 'erp-nuxt-stock-transactions-v2'
 const auditLogStorageKey = 'erp-nuxt-audit-logs-v1'
+const importKeyFieldsByDataset: Record<string, string[]> = {
+  customers: ['code'],
+  items: ['code'],
+  inventory: ['item', 'warehouse'],
+  orders: ['no'],
+  purchase: ['no'],
+  production: ['no'],
+  users: ['id']
+}
 
 const initialStockTransactions: ErpRow[] = [
   { no: 'ST-260531-001', type: '입고', item: '컨트롤 PCB V2', warehouse: '전자부품 창고', qty: 120, owner: '이자재', memo: '발주 입고 mock', lastDate: todayText, status: '완료' },
@@ -372,6 +381,130 @@ export function useMockErpStore() {
     return transaction
   }
 
+  function importRows(dataset: string, rows: ErpRow[], moduleName: string) {
+    const keyFields = importKeyFieldsByDataset[dataset] || ['no']
+    const currentRows = [...(datasets.value[dataset] || [])]
+    let insertedCount = 0
+    let updatedCount = 0
+
+    rows.forEach((row, index) => {
+      const normalized = normalizeImportedRow(dataset, row, index)
+      const existingIndex = currentRows.findIndex((item) => keyFields.every((field) => String(item[field] || '') === String(normalized[field] || '')))
+
+      if (existingIndex >= 0) {
+        currentRows[existingIndex] = { ...currentRows[existingIndex], ...normalized }
+        updatedCount += 1
+      } else {
+        currentRows.unshift(normalized)
+        insertedCount += 1
+      }
+    })
+
+    datasets.value = {
+      ...datasets.value,
+      [dataset]: currentRows
+    }
+    persistDatasets()
+
+    if (insertedCount || updatedCount) {
+      recordAuditLog({
+        moduleKey: dataset,
+        moduleName,
+        action: 'CSV 가져오기',
+        documentNo: `${insertedCount + updatedCount}건`,
+        summary: `${moduleName} CSV 데이터 ${insertedCount + updatedCount}건 반영`,
+        afterStatus: '완료',
+        memo: `신규 ${insertedCount}건, 수정 ${updatedCount}건`
+      })
+    }
+
+    return {
+      insertedCount,
+      updatedCount,
+      totalCount: insertedCount + updatedCount
+    }
+  }
+
+  function normalizeImportedRow(dataset: string, row: ErpRow, index: number) {
+    if (dataset === 'customers') {
+      return {
+        ...row,
+        code: row.code || nextCustomerCode(index),
+        amount: normalizeImportedNumber(row.amount),
+        lastDate: row.lastDate || todayText,
+        status: row.status || '대기'
+      } as ErpRow
+    }
+
+    if (dataset === 'items') {
+      return {
+        ...row,
+        code: row.code || nextItemCode(index),
+        purchase: normalizeImportedNumber(row.purchase),
+        sales: normalizeImportedNumber(row.sales),
+        owner: row.owner || '이자재',
+        lastDate: row.lastDate || todayText,
+        status: row.status || '대기'
+      } as ErpRow
+    }
+
+    if (dataset === 'inventory') {
+      return normalizeInventoryRow({
+        ...row,
+        current: normalizeImportedNumber(row.current),
+        reserved: normalizeImportedNumber(row.reserved),
+        safety: normalizeImportedNumber(row.safety),
+        lastDate: row.lastDate || todayText
+      })
+    }
+
+    if (dataset === 'orders') {
+      return normalizeOrder({
+        ...row,
+        no: row.no || nextNo('orders', 'SO', index),
+        qty: normalizeImportedNumber(row.qty),
+        amount: normalizeImportedNumber(row.amount),
+        owner: row.owner || '최영업',
+        status: row.status || '대기'
+      })
+    }
+
+    if (dataset === 'purchase') {
+      return {
+        ...row,
+        no: row.no || nextNo('purchase', 'PO', index),
+        qty: normalizeImportedNumber(row.qty),
+        amount: normalizeImportedNumber(row.amount),
+        owner: row.owner || '박구매',
+        status: row.status || '대기'
+      } as ErpRow
+    }
+
+    if (dataset === 'production') {
+      return {
+        ...row,
+        no: row.no || nextProductionNo(index),
+        qty: normalizeImportedNumber(row.qty),
+        progress: normalizeImportedNumber(row.progress),
+        status: row.status || '대기'
+      } as ErpRow
+    }
+
+    if (dataset === 'users') {
+      return {
+        ...row,
+        id: row.id || nextUserId(index),
+        lastDate: row.lastDate || todayText,
+        status: row.status || '정상'
+      } as ErpRow
+    }
+
+    return {
+      ...row,
+      status: row.status || '대기'
+    } as ErpRow
+  }
+
   function recordWorkflowAudit(moduleKey: string, moduleName: string, before: ErpRow, after: ErpRow, summary: string) {
     const statusChanged = String(before.status || '') !== String(after.status || '')
     const qtyChanged = Number(before.qty || 0) !== Number(after.qty || 0)
@@ -535,36 +668,43 @@ export function useMockErpStore() {
     }
   }
 
-  function nextCustomerCode() {
+  function nextCustomerCode(offset = 0) {
     const numbers = (datasets.value.customers || [])
       .map((row) => Number(String(row.code).replace(/\D/g, '')))
       .filter((value) => Number.isFinite(value))
-    return `C-${Math.max(1000, ...numbers) + 1}`
+    return `C-${Math.max(1000, ...numbers) + offset + 1}`
   }
 
-  function nextItemCode() {
+  function nextItemCode(offset = 0) {
     const numbers = (datasets.value.items || [])
       .map((row) => Number(String(row.code).replace(/\D/g, '')))
       .filter((value) => Number.isFinite(value))
-    return `P-${Math.max(2000, ...numbers) + 1}`
+    return `P-${Math.max(2000, ...numbers) + offset + 1}`
   }
 
-  function nextNo(dataset: 'orders' | 'purchase', prefix: 'SO' | 'PO') {
+  function nextNo(dataset: 'orders' | 'purchase', prefix: 'SO' | 'PO', offset = 0) {
     const numbers = (datasets.value[dataset] || [])
       .map((row) => Number(String(row.no).split('-').at(-1)))
       .filter((value) => Number.isFinite(value))
-    return `${prefix}-260531-${String(Math.max(0, ...numbers) + 1).padStart(3, '0')}`
+    return `${prefix}-260531-${String(Math.max(0, ...numbers) + offset + 1).padStart(3, '0')}`
   }
 
-  function nextProductionNo() {
+  function nextProductionNo(offset = 0) {
     const numbers = (datasets.value.production || [])
       .map((row) => Number(String(row.no).split('-').at(-1)))
       .filter((value) => Number.isFinite(value))
-    return `PL-260531-${String(Math.max(0, ...numbers) + 1).padStart(3, '0')}`
+    return `PL-260531-${String(Math.max(0, ...numbers) + offset + 1).padStart(3, '0')}`
   }
 
   function nextStockNo() {
     return `ST-260531-${String(stockTransactions.value.length + 1).padStart(3, '0')}`
+  }
+
+  function nextUserId(index = 0) {
+    const numbers = (datasets.value.users || [])
+      .map((row) => Number(String(row.id).replace(/\D/g, '')))
+      .filter((value) => Number.isFinite(value))
+    return `u${String(Math.max(0, ...numbers) + index + 1).padStart(3, '0')}`
   }
 
   function nextAuditNo() {
@@ -664,7 +804,8 @@ export function useMockErpStore() {
     createProductionFromOrder,
     updateProduction,
     addStockTransaction,
-    recordAuditLog
+    recordAuditLog,
+    importRows
   }
 }
 
@@ -679,6 +820,14 @@ function normalizeDatasets(input: Record<string, ErpRow[]>) {
     ...input,
     inventory: (input.inventory || []).map(normalizeInventoryRow)
   }
+}
+
+function normalizeImportedNumber(value: unknown) {
+  if (value === undefined || value === '') {
+    return 0
+  }
+
+  return Number(String(value).replace(/,/g, '')) || 0
 }
 
 function normalizeInventoryRow(row: ErpRow) {
